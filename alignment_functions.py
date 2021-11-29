@@ -1,13 +1,11 @@
-#       _ _                                  _      __                  _   _                 
-#      | (_)                                | |    / _|                | | (_)                
-#  __ _| |_  __ _ _ __  _ __ ___   ___ _ __ | |_  | |_ _   _ _ __   ___| |_ _  ___  _ __  ___ 
-# / _` | | |/ _` | '_ \| '_ ` _ \ / _ | '_ \| __| |  _| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
-#| (_| | | | (_| | | | | | | | | |  __| | | | |_  | | | |_| | | | | (__| |_| | (_) | | | \__ \
-# \__,_|_|_|\__, |_| |_|_| |_| |_|\___|_| |_|\__| |_|  \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
-            __/ |                                                                            
-           |___/              
-#
-# 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import seaborn as sns
+from scipy import signal
+import PyTrack.etDataReader as et
+
 
 def getStartEndTimestamps( array_DF, task, **kwargs ):
     """
@@ -393,6 +391,7 @@ def add_saccade_onsets( df, stimon_eventmarker, trialsuccess_eventmarker ):
     given a df and column names that refer to eventmarkers for stimon & trialsuccess,
     create 'saccade_onset': a new column in df that holds a list of the saccade(?) to target
     """
+    #import PyTrack.etDataReader as et
     dthresh = 5
     num_trials = df.shape[0]
     saccade_onset = []
