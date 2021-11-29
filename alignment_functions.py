@@ -386,30 +386,35 @@ def eyetrace4trials( df, eventmarker, t_start, t_stop=-1 ):
     return plt
 
 # write a function that will create a feature for the onset of the saccade to target
+# write a function that will create a feature for the onset of the saccade to target
 def add_saccade_onsets( df, stimon_eventmarker, trialsuccess_eventmarker ):
     """
     given a df and column names that refer to eventmarkers for stimon & trialsuccess,
     create 'saccade_onset': a new column in df that holds a list of the saccade(?) to target
     """
-    #import PyTrack.etDataReader as et
     dthresh = 5
     num_trials = df.shape[0]
     saccade_onset = []
     
-    for trial in range(0,14):
+    for trial in range(0,num_trials):
         s, es = et.saccade_detection( df[ 'X_eye' ][trial], 
                              df[ 'Y_eye' ][trial], 
                              np.arange( 0, len( df[ 'Y_eye' ][trial]) ) - df[ stimon_eventmarker ][trial],
-                             minlen=15, maxvel=40)
+                             minlen=10, maxvel=40)
+        #print( 'trial: ', trial )
+        success = 0
         for sacc in es:
             coord_dist = math.sqrt( ((sacc[3] - sacc[5])**2)+((sacc[4] - sacc[6])**2) )
             if coord_dist > dthresh:
                 if sacc[0] > 0 and sacc[0] < ( df[ 'bhv_code666' ][trial][0] - df[ 'bhv_code40' ][trial][0] ):
-                    saccade_onset.append( [sacc[0]] )
-
-        #print( sacc[0] )
+                    success += 1
+                    if success == 1:
+                        saccade_onset.append( [sacc[0]] )
+                    else:
+                        pass
     
     df[ 'saccade_onset' ] = pd.Series( saccade_onset )
+    #print( len(saccade_onset) )
     return df
 
 def alignments4trials( df, stimon_marker, saccadeinit_marker, t_start, t_stop=-1 ):
@@ -456,7 +461,7 @@ def adjustSpikes_SaccadeStart( data_df, saccadeStart_eventmarker, dataType ):
     columns2adjust = getDataTypeNames( data_df, dataType )
     columns2adjust = columns2adjust.values.tolist() 
     columns2adjust = [item for sublist in columns2adjust for item in sublist]
-    print( columns2adjust )
+    #print( columns2adjust )
     
     #for each column
     for column in columns2adjust:
