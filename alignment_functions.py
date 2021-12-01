@@ -406,7 +406,7 @@ def add_saccade_onsets( df, stimon_eventmarker, trialsuccess_eventmarker ):
         for sacc in es:
             coord_dist = math.sqrt( ((sacc[3] - sacc[5])**2)+((sacc[4] - sacc[6])**2) )
             if coord_dist > dthresh:
-                if sacc[0] > 0 and sacc[0] < ( df[ 'bhv_code666' ][trial][0] - df[ 'bhv_code40' ][trial][0] ):
+                if sacc[0] > 0 and sacc[0] < ( df[ trialsuccess_eventmarker ][trial][0] - df[ stimon_eventmarker ][trial][0] ):
                     success += 1
                     if success == 1:
                         saccade_onset.append( [sacc[0]] )
@@ -535,3 +535,61 @@ def eyespike_dualAligned( df, channel, stimon_marker, saccadeinit_marker, time_a
     fig.text(0.04, 0.5, 'Saccade Amplitude (DVA)', va='center', rotation='vertical')
     return fig
 
+def catSearchPHYSIOL2pandasdf( bhvmat ):
+    """
+    move catSearchPHYSIOL data from a .mat file adaptation of a .bhv file 
+    into a more human-friendly format as a pandas dataframe
+    
+    takes an input a .mat file returns a df
+    """
+     
+    num_trials = bhvmat['TrialRecord'][0][0][0][0][0]
+    trial_nums = list( range( 1,num_trials + 1 ) )
+    trial_Labels = [ 'Trial' + str( trial_num ) for trial_num in trial_nums ]
+    trial_errors = [ bhvmat[ trial_label ][0][0][4][0][0] for trial_label in trial_Labels ]
+    AbsTST = [ bhvmat[ trial_label ][0][0][6][0][0] for trial_label in trial_Labels ]
+    Eyedat = [ bhvmat[ trial_label ][0][0][9][0][0][1] for trial_label in trial_Labels ]
+    BHVCodes = [ bhvmat[ trial_label ][0][0][8][0][0] for trial_label in trial_Labels ]
+    ifTarget = [ bhvmat[ trial_label ][0][0][14][0][0][2][0][0][0][0] for trial_label in trial_Labels ]
+    MOSTTarget = [ bhvmat[ trial_label ][0][0][14][0][0][2][0][0][1][0] for trial_label in trial_Labels ]
+    ArOr = [ bhvmat[ trial_label ][0][0][14][0][0][2][0][0][2][0] for trial_label in trial_Labels ]
+        
+
+    bhv_data = { 'Trial_Number':trial_nums,
+                'Trial_Labels':trial_Labels,
+                'Trial_Error':trial_errors,
+                'AbsoluteTrialStartTime':AbsTST,
+                'AnalogEyeData':Eyedat,
+                'BehavioralCodes':BHVCodes,
+                'ifTarget':ifTarget,
+                'MOSTTarget':MOSTTarget,
+                'ArOr':ArOr }
+    bhv_df = pd.DataFrame( bhv_data )
+    
+    return bhv_df
+
+def eyespike_stimOnAligned( df, channel, stimon_marker, time_axis_limits_ms, trial_start, trial_stop=-1 ):
+    """
+    subplot X,Y analog eye-traces and smoothed spike histograms
+    for a given range of trials (trial_start, trial_stop):
+    plot1 = stimOn spikes align
+    plot2 = stimOn eye align
+    """
+    fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True, figsize=(6, 10))
+    
+    plt.subplot( 2,1,1 )
+    stimOn_label = 'stimOn_' + channel
+    af.channelGaussianSmoothed( df, stimOn_label, 10, time_axis_limits_ms )
+    
+    plt.subplot( 2,1,2 )
+    for idx,_ in enumerate( df['AnalogEyeData'][trial_start:trial_stop] ):
+        length = len( df['AnalogEyeData'][trial_start + idx] )
+        x =  np.arange( 0, length ) - df[stimon_marker][trial_start + idx][0]
+        plt.plot(x, df['X_eye'][trial_start + idx], label = "trial 1 X", color = 'red')
+        plt.plot(x, df['Y_eye'][trial_start + idx], label = "trial 1 Y", color = 'blue')
+        plt.axvline( x=0, color = 'black'  )
+        plt.title( 'stimuOn eyetrace' )
+    plt.xlim( time_axis_limits_ms ) 
+    plt.ylabel('amplitude (DVA)')
+    
+    return fig
