@@ -568,6 +568,22 @@ def catSearchPHYSIOL2pandasdf( bhvmat ):
     
     return bhv_df
 
+def eyeVoyage( df, channel, time_axis_limits_ms, trial_start, trial_stop=-1 ):
+    """
+    subplot X,Y analog eye-traces 2D
+    for a given range of trials (trial_start, trial_stop):
+    """
+    for idx,_ in enumerate( df['AnalogEyeData'][trial_start:trial_stop] ):
+        start = round( df['bhv_code40'][0][0] )
+        stop = round( df['bhv_code14'][0][0] )
+        plt.scatter(df['X_eye'][trial_start + idx][start:stop],  df['Y_eye'][trial_start + idx][start:stop],s=2, color = 'red', alpha = 0.2)
+        plt.title( 'eyetrace 2D' )
+    plt.xlim( [ -25, 25 ] ) 
+    plt.ylim( [ -25, 25 ] ) 
+    plt.ylabel('amplitude (DVA)')
+    plt.xlabel('amplitude (DVA)')
+
+
 def eyespike_stimOnAligned( df, channel, stimon_marker, time_axis_limits_ms, trial_start, trial_stop=-1 ):
     """
     subplot X,Y analog eye-traces and smoothed spike histograms
@@ -575,21 +591,25 @@ def eyespike_stimOnAligned( df, channel, stimon_marker, time_axis_limits_ms, tri
     plot1 = stimOn spikes align
     plot2 = stimOn eye align
     """
-    fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True, figsize=(6, 10))
+    fig = plt.figure(constrained_layout=True,  figsize=(10, 8))
+    gs1 = fig.add_gridspec(nrows=2, ncols=3)
     
-    plt.subplot( 2,1,1 )
     stimOn_label = 'stimOn_' + channel
-    af.channelGaussianSmoothed( df, stimOn_label, 10, time_axis_limits_ms )
+    fig1a = fig.add_subplot(gs1[0,0])
+    channelGaussianSmoothed( df, stimOn_label, 10, time_axis_limits_ms )
     
-    plt.subplot( 2,1,2 )
+    fig1b = fig.add_subplot(gs1[1,0])
     for idx,_ in enumerate( df['AnalogEyeData'][trial_start:trial_stop] ):
         length = len( df['AnalogEyeData'][trial_start + idx] )
         x =  np.arange( 0, length ) - df[stimon_marker][trial_start + idx][0]
         plt.plot(x, df['X_eye'][trial_start + idx], label = "trial 1 X", color = 'red')
         plt.plot(x, df['Y_eye'][trial_start + idx], label = "trial 1 Y", color = 'blue')
         plt.axvline( x=0, color = 'black'  )
-        plt.title( 'stimuOn eyetrace' )
+        plt.title( 'stimOn eyetrace' )
     plt.xlim( time_axis_limits_ms ) 
     plt.ylabel('amplitude (DVA)')
+    
+    fig1c = fig.add_subplot(gs1[:,1:])
+    eyeVoyage( df, channel, time_axis_limits_ms, 0  )
     
     return fig
