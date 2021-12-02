@@ -5,6 +5,7 @@ import math
 import seaborn as sns
 from scipy import signal
 import PyTrack.etDataReader as et
+import matplotlib.patches as mpatches
 
 
 def getStartEndTimestamps( array_DF, task, **kwargs ):
@@ -232,7 +233,8 @@ def channelGaussianSmoothed( data_df, channel, sigma, time_axis_limits_ms ):
     plt.hist(bins[:-1], bins, weights=counts/num_trials, color = [0.75, 0.75, 0.75 ])
     smoothedSpikes = gaussian_filter1d(counts/num_trials, sigma)
     plt.plot( bins[:-1], smoothedSpikes, lw = 2, color = 'k' )
-    plt.xlim(time_axis_limits_ms)           
+    plt.xlim(time_axis_limits_ms) 
+    plt.xlabel("time (ms)")          
     plt.ylabel('spikes/ms')            
     plt.title(channel)             
     plt.axvline(x=0, c = 'red')    
@@ -488,7 +490,8 @@ def saccadeStart_GaussianSmoothed( data_df, channel, sigma, time_axis_limits_ms 
     smoothedSpikes = gaussian_filter1d(counts/num_trials, sigma)
     plt.plot( bins[:-1], smoothedSpikes, lw = 2, color = 'k' )
     plt.xlim(time_axis_limits_ms)            
-    plt.ylabel('spikes/ms')            
+    plt.ylabel('spikes/ms') 
+    plt.xlabel("time (ms)")           
     plt.title(channel)             
     plt.axvline(x=0, c = 'red')    
     return smoothedSpikes
@@ -504,35 +507,34 @@ def eyespike_dualAligned( df, channel, stimon_marker, saccadeinit_marker, time_a
     """
     fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(12, 10))
     
-    plt.subplot( 2,2,1 )
+    plt.subplot( 2,2,3 )
     stimOn_label = 'stimOn_' + channel
     channelGaussianSmoothed( df, stimOn_label, 10, time_axis_limits_ms )
     
-    plt.subplot( 2,2,2 )
+    plt.subplot( 2,2,4 )
     saccadeStart_label = 'saccadeStart_' + channel
     saccadeStart_GaussianSmoothed( df, saccadeStart_label, 10, time_axis_limits_ms )
     
-    plt.subplot( 2,2,3 )
+    plt.subplot( 2,2,1 )
     for idx,_ in enumerate( df['AnalogEyeData'][trial_start:trial_stop] ):
         length = len( df['AnalogEyeData'][trial_start + idx] )
         x =  np.arange( 0, length ) - df[stimon_marker][trial_start + idx][0]
         plt.plot(x, df['X_eye'][trial_start + idx], label = "trial 1 X", color = 'red')
         plt.plot(x, df['Y_eye'][trial_start + idx], label = "trial 1 Y", color = 'blue')
-        plt.axvline( x=0, color = 'black'  )
-        plt.title( 'Stimulus Onset' )
+    plt.axvline( x=0, color = 'black'  )
+    plt.title( 'Stimulus Onset' )
+    plt.ylabel( 'Saccade Amplitude (DVA)' )
     plt.xlim( time_axis_limits_ms )  
     
-    plt.subplot( 2,2,4 )
+    plt.subplot( 2,2,2 )
     for idx,_ in enumerate( df['AnalogEyeData'][trial_start:trial_stop] ):
         length = len( df['AnalogEyeData'][trial_start + idx] )
         x =  np.arange( 0, length ) - df[saccadeinit_marker][trial_start + idx][0] - df[stimon_marker][trial_start + idx][0]
         plt.plot(x, df['X_eye'][trial_start + idx], label = "trial 1 X", color = 'red')
         plt.plot(x, df['Y_eye'][trial_start + idx], label = "trial 1 Y", color = 'blue')
         plt.title( 'Saccade Onset' )
-        plt.xlabel("Time (ms)")
     plt.xlim( time_axis_limits_ms )
     
-    fig.text(0.04, 0.5, 'Saccade Amplitude (DVA)', va='center', rotation='vertical')
     return fig
 
 def catSearchPHYSIOL2pandasdf( bhvmat ):
@@ -613,3 +615,141 @@ def eyespike_stimOnAligned( df, channel, stimon_marker, time_axis_limits_ms, tri
     eyeVoyage( df, channel, time_axis_limits_ms, 0  )
     
     return fig
+
+# a simple plot of instantaneous firing rate
+def channelGaussianSmoothed_180( df_in, df_out, channel, sigma, time_axis_limits_ms ):
+    """
+    Takes in a spiketrain (list of spike times) and returns a smooth firing 
+    rate estimate that does not rely on binnning of a spie train. the instantaneous rate
+    isa convolution of the spiketrain with a firing rate kernel
+    """
+    from scipy.ndimage import gaussian_filter1d
+    
+    # df_in
+    num_trials = df_in.shape[0]
+    spiketrain = df_in[channel].sum()
+    b = np.arange(time_axis_limits_ms[0], time_axis_limits_ms[1], 1)
+    (counts, bins) = np.histogram(spiketrain, bins=b)
+    plt.hist(bins[:-1], bins, weights=counts/num_trials, 
+             color = [0.40, 0.10, 0.10 ],
+             alpha=0.5)
+    smoothedSpikes = gaussian_filter1d(counts/num_trials, sigma)
+    plt.plot( bins[:-1], smoothedSpikes, lw = 2, color = 'r' )
+    
+    #df_out
+    num_trials = df_out.shape[0]
+    spiketrain = df_out[channel].sum()
+    b = np.arange(time_axis_limits_ms[0], time_axis_limits_ms[1], 1)
+    (counts, bins) = np.histogram(spiketrain, bins=b)
+    plt.hist(bins[:-1], bins, weights=counts/num_trials, 
+             color = [0.1, 0.4, 0.1 ],
+             alpha=0.5)
+    smoothedSpikes = gaussian_filter1d(counts/num_trials, sigma)
+    plt.plot( bins[:-1], smoothedSpikes, lw = 2, color = 'g' )
+    
+    red_patch = mpatches.Patch(color='red', label='in RF')
+    green_patch = mpatches.Patch(color='green', label='out RF')
+    plt.legend(handles=[red_patch, green_patch])
+    plt.xlim(time_axis_limits_ms)           
+    plt.ylabel('spikes/ms')
+    plt.xlabel("time (ms)")
+    plt.title(channel)             
+    plt.axvline(x=0, c = 'k')    
+
+# a simple plot of instantaneous firing rate
+def saccadeStart_GaussianSmoothed_180( df_in, df_out, channel, sigma, time_axis_limits_ms ):
+    """
+    Takes in a spiketrain (list of spike times) and returns a smooth firing 
+    rate estimate that does not rely on binnning of a spie train. the instantaneous rate
+    isa convolution of the spiketrain with a firing rate kernel
+    """
+    from scipy.ndimage import gaussian_filter1d
+    
+    # in RF
+    num_trials = df_in.shape[0]
+    b = np.arange(time_axis_limits_ms[0], time_axis_limits_ms[1], 1)
+    neuralData = df_in[channel].sum()      
+    (counts, bins) = np.histogram(neuralData, bins=b)
+    plt.hist(bins[:-1], bins, weights=counts/num_trials, 
+             color = [0.4, 0.1, 0.1 ],
+             alpha=0.5)
+    smoothedSpikes = gaussian_filter1d(counts/num_trials, sigma)
+    plt.plot( bins[:-1], smoothedSpikes, lw = 2, color = 'r', label='in RF' )
+    
+    # out RF
+    num_trials = df_out.shape[0]
+    b = np.arange(time_axis_limits_ms[0], time_axis_limits_ms[1], 1)
+    neuralData = df_out[channel].sum()      
+    (counts, bins) = np.histogram(neuralData, bins=b)
+    plt.hist(bins[:-1], bins, weights=counts/num_trials, 
+             color = [0.1, 0.4, 0.1 ],
+             alpha=0.5)
+    smoothedSpikes = gaussian_filter1d(counts/num_trials, sigma)
+    plt.plot( bins[:-1], smoothedSpikes, lw = 2, color = 'g', label='out RF' )    
+    
+    plt.xlim(time_axis_limits_ms)            
+    plt.ylabel('spikes/ms')  
+    plt.xlabel("time (ms)")
+    plt.title(channel)             
+    plt.axvline(x=0, c = 'k')    
+
+def eyespike_dualAligned_180( df, channel, stimon_marker, saccadeinit_marker, time_axis_limits_ms, trial_start, trial_stop=-1 ):
+    """
+    for delayed saccade 180
+    subplot X,Y analog eye-traces and smoothed spike histograms
+    for a given range of trials (trial_start, trial_stop):
+    plot1 = stimOn spikes align
+    plot2 = saccade spikes align
+    plot3 = stimOn eye align
+    plot4 = saccade eye align
+    """
+    df_inRF = df[df['inRF']==True].reset_index(drop=True)
+    df_outRF = df[df['inRF']==False].reset_index(drop=True)
+    
+    fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(12, 10))
+    
+    plt.subplot( 2,2,3 )
+    stimOn_label = 'stimOn_' + channel
+    channelGaussianSmoothed_180( df_inRF, df_outRF, stimOn_label, 10, time_axis_limits_ms )
+
+    
+    plt.subplot( 2,2,4 )
+    saccadeStart_label = 'saccadeStart_' + channel
+    saccadeStart_GaussianSmoothed_180( df_inRF, df_outRF, saccadeStart_label, 10, time_axis_limits_ms )
+    
+    plt.subplot( 2,2,1 )
+    for idx,_ in enumerate( df_inRF['AnalogEyeData'][trial_start:trial_stop] ):
+        length = len( df_inRF['AnalogEyeData'][trial_start + idx] )
+        x =  np.arange( 0, length ) - df_inRF[stimon_marker][trial_start + idx][0]
+        plt.plot(x, df_inRF['X_eye'][trial_start + idx], color = 'red')
+        plt.plot(x, df_inRF['Y_eye'][trial_start + idx], color = 'red')
+    for idx,_ in enumerate( df_outRF['AnalogEyeData'][trial_start:trial_stop] ):
+        length = len( df_outRF['AnalogEyeData'][trial_start + idx] )
+        x =  np.arange( 0, length ) - df_outRF[stimon_marker][trial_start + idx][0]
+        plt.plot(x, df_outRF['X_eye'][trial_start + idx], color = 'green')
+        plt.plot(x, df_outRF['Y_eye'][trial_start + idx], color = 'green')
+    
+    red_patch = mpatches.Patch(color='red', label='in RF')
+    green_patch = mpatches.Patch(color='green', label='out RF')
+    plt.legend(handles=[red_patch, green_patch])
+    plt.axvline( x=0, color = 'black'  )
+    plt.ylabel( 'Saccade Amplitude (DVA)' )
+    plt.title( 'Stimulus Onset' )
+    plt.xlim( time_axis_limits_ms )  
+    
+    plt.subplot( 2,2,2 )
+    for idx,_ in enumerate( df_inRF['AnalogEyeData'][trial_start:trial_stop] ):
+        length = len( df_inRF['AnalogEyeData'][trial_start + idx] )
+        x =  np.arange( 0, length ) - df_inRF[saccadeinit_marker][trial_start + idx][0] - df_inRF[stimon_marker][trial_start + idx][0]
+        plt.plot(x, df_inRF['X_eye'][trial_start + idx], color = 'red')
+        plt.plot(x, df_inRF['Y_eye'][trial_start + idx], color = 'red')
+    for idx,_ in enumerate( df_outRF['AnalogEyeData'][trial_start:trial_stop] ):
+        length = len( df_outRF['AnalogEyeData'][trial_start + idx] )
+        x =  np.arange( 0, length ) - df_outRF[saccadeinit_marker][trial_start + idx][0] - df_outRF[stimon_marker][trial_start + idx][0]
+        plt.plot(x, df_outRF['X_eye'][trial_start + idx], color = 'green')
+        plt.plot(x, df_outRF['Y_eye'][trial_start + idx], color = 'green')        
+    plt.title( 'Saccade Onset' )
+    plt.axvline( x=0, color = 'black'  )
+    plt.xlim( time_axis_limits_ms )
+    
+    return fig    
