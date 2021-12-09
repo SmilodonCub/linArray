@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import math
 import seaborn as sns
 from scipy import signal
-import PyTrack.etDataReader as et
 import matplotlib.patches as mpatches
 
 
@@ -399,7 +398,7 @@ def add_saccade_onsets( df, stimon_eventmarker, trialsuccess_eventmarker ):
     saccade_onset = []
     
     for trial in range(0,num_trials):
-        s, es = et.saccade_detection( df[ 'X_eye' ][trial], 
+        s, es = saccade_detection( df[ 'X_eye' ][trial], 
                              df[ 'Y_eye' ][trial], 
                              np.arange( 0, len( df[ 'Y_eye' ][trial]) ) - df[ stimon_eventmarker ][trial],
                              minlen=10, maxvel=40)
@@ -505,7 +504,7 @@ def eyespike_dualAligned( df, channel, stimon_marker, saccadeinit_marker, time_a
     plot3 = stimOn eye align
     plot4 = saccade eye align
     """
-    fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(12, 10))
+    fig, ax = plt.subplots(nrows=2, ncols=2, sharex=False, sharey=False, figsize=(12, 10))
     
     plt.subplot( 2,2,3 )
     stimOn_label = 'stimOn_' + channel
@@ -535,6 +534,8 @@ def eyespike_dualAligned( df, channel, stimon_marker, saccadeinit_marker, time_a
         plt.title( 'Saccade Onset' )
     plt.xlim( time_axis_limits_ms )
     
+    return fig
+        
     return fig
 
 def catSearchPHYSIOL2pandasdf( bhvmat ):
@@ -703,10 +704,10 @@ def eyespike_dualAligned_180( df, channel, stimon_marker, saccadeinit_marker, ti
     plot3 = stimOn eye align
     plot4 = saccade eye align
     """
-    df_inRF = df[df['inRF']==True].reset_index(drop=True)
-    df_outRF = df[df['inRF']==False].reset_index(drop=True)
+    df_inRF = df[df['inRF']==False].reset_index(drop=True)
+    df_outRF = df[df['inRF']==True].reset_index(drop=True)
     
-    fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, figsize=(12, 10))
+    fig, ax = plt.subplots(nrows=2, ncols=2, sharex=False, sharey=False, figsize=(12, 10))
     
     plt.subplot( 2,2,3 )
     stimOn_label = 'stimOn_' + channel
@@ -753,3 +754,95 @@ def eyespike_dualAligned_180( df, channel, stimon_marker, saccadeinit_marker, ti
     plt.xlim( time_axis_limits_ms )
     
     return fig    
+
+def saccade_detection(x, y, time, missing=0.0, minlen=5, maxvel=40, maxacc=340):
+    """
+    Detects saccades, defined as consecutive samples with an inter-sample velocity of over a velocity threshold or an acceleration threshold
+	Parameters
+	----------
+	x : array
+		Gaze x positions
+	y :	array
+		Gaze y positions
+	time : array
+		Timestamps
+	missing	: float
+		Value to be used for missing data (default = 0.0)
+	minlen : int
+		Minimal length of saccades in milliseconds; all detected saccades with len(sac) < minlen will be ignored (default = 5)
+	maxvel : int
+		Velocity threshold in pixels/second (default = 40)
+	maxacc : int
+		Acceleration threshold in pixels / second**2 (default = 340)
+	Returns
+	-------
+	Ssac : list of lists
+		Each containing [starttime]
+	Esac : list of lists
+		Each containing [starttime, endtime, duration, startx, starty, endx, endy]
+	From PyTrack
+    """
+    # CONTAINERS
+    Ssac = []
+    Esac = []
+
+	# INTER-SAMPLE MEASURES
+    intdist = (numpy.diff(x)**2 + numpy.diff(y)**2)**0.5
+    inttime = numpy.diff(time)
+	# recalculate inter-sample times to seconds
+    inttime = inttime / 1000.0
+
+	# VELOCITY AND ACCELERATION
+	# the velocity between samples is the inter-sample distance
+	# divided by the inter-sample time
+    vel = intdist / inttime
+	# the acceleration is the sample-to-sample difference in
+	# eye movement velocity
+    acc = numpy.diff(vel)
+
+	# SACCADE START AND END
+    t0i = 0
+    stop = False
+    while not stop:
+		# saccade start (t1) is when the velocity or acceleration
+		# surpass threshold, saccade end (t2) is when both return
+		# under threshold
+
+		# detect saccade starts
+        sacstarts = numpy.where((vel[1+t0i:] > maxvel).astype(int) + (acc[t0i:] > maxacc).astype(int) >= 1)[0]
+        if len(sacstarts) > 0:
+			# timestamp for starting position
+            t1i = t0i + sacstarts[0] + 1
+            if t1i >= len(time)-1:
+                t1i = len(time)-2
+                t1 = time[t1i]
+
+			# add to saccade starts
+            Ssac.append([t1])
+
+			# detect saccade endings
+            sacends = numpy.where((vel[1+t1i:] < maxvel).astype(int) + (acc[t1i:] < maxacc).astype(int) == 2)[0]
+            if len(sacends) > 0:
+				# timestamp for ending position
+                t2i = sacends[0] + 1 + t1i + 2
+                if t2i >= len(time):
+                    t2i = len(time)-1
+                t2 = time[t2i]
+                dur = t2 - t1
+
+				# ignore saccades that did not last long enough
+                if dur >= minlen:
+					# add to saccade ends
+                    Esac.append([t1, t2, dur, x[t1i], y[t1i], x[t2i], y[t2i]])
+                else:
+					# remove last saccade start on too low duration
+                    Ssac.pop(-1)
+
+				# update t0i
+                t0i = 0 + t2i
+            else:
+                stop = True
+        else:
+            stop = True
+
+    return Ssac, Esac
